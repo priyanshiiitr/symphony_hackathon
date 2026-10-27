@@ -1,0 +1,258 @@
+{
+  "distributor": {
+    "name": "Bharat Hardware Distributors",
+    "agent_name": "Ravi"
+  },
+  "retailers": [
+    {
+      "id": "R01",
+      "shop_name": "Sharma Electricals",
+      "contact_name": "Ramesh Sharma",
+      "phone": "+919571025342",
+      "city": "Jaipur",
+      "preferred_language": "hi",
+      "usual_brands": ["Havells", "Polycab"],
+      "credit_terms": "Net 15",
+      "credit_hold": false
+    },
+    {
+      "id": "R02",
+      "shop_name": "Gupta Sanitary",
+      "contact_name": "Suresh Gupta",
+      "phone": "+919876543211",
+      "city": "Jaipur",
+      "preferred_language": "hi",
+      "usual_brands": ["Astral", "Supreme"],
+      "credit_terms": "Net 7",
+      "credit_hold": false
+    },
+    {
+      "id": "R03",
+      "shop_name": "Metro Hardware",
+      "contact_name": "Amit Verma",
+      "phone": "+919876543212",
+      "city": "Ajmer",
+      "preferred_language": "en",
+      "usual_brands": ["Bosch", "Stanley"],
+      "credit_terms": "Cash",
+      "credit_hold": false
+    },
+    {
+      "id": "R04",
+      "shop_name": "Singh Paints & Hardware",
+      "contact_name": "Gurpreet Singh",
+      "phone": "+919876543213",
+      "city": "Jaipur",
+      "preferred_language": "hi",
+      "usual_brands": ["Asian Paints", "Berger"],
+      "credit_terms": "Net 15",
+      "credit_hold": false
+    },
+    {
+      "id": "R05",
+      "shop_name": "Raj Electric Store",
+      "contact_name": "Rajesh Meena",
+      "phone": "+919876543214",
+      "city": "Kota",
+      "preferred_language": "hi",
+      "usual_brands": ["Havells", "Anchor"],
+      "credit_terms": "Net 30",
+      "credit_hold": true
+    }
+  ],
+  "skus": [
+    {
+      "sku": "WIRE-CU-1.5",
+      "name": "Copper Wire 1.5mm",
+      "brand": "Havells",
+      "unit": "coil",
+      "aliases": ["copper wire", "taar", "wire 1.5", "1.5 mm wire", "haavells wire"],
+      "stock_qty": 40,
+      "substitute_sku": "WIRE-CU-2.5"
+    },
+    {
+      "sku": "WIRE-CU-2.5",
+      "name": "Copper Wire 2.5mm",
+      "brand": "Polycab",
+      "unit": "coil",
+      "aliases": ["wire 2.5", "2.5 mm wire", "moti taar"],
+      "stock_qty": 25,
+      "substitute_sku": null
+    },
+    {
+      "sku": "MCB-32A",
+      "name": "MCB 32 Amp",
+      "brand": "Havells",
+      "unit": "piece",
+      "aliases": [
+        "mcb", "mcb 32", "32 amp", "mcb batti wala", "32a mcb", "tripper",
+        "mcb 32 amp", "mcb 32 ampere", "mcb 32 ampier", "32 ampier", "32 ampere mcb",
+        "do mcb", "mcb packet", "50 50 wale mcb", "mca", "mca 32", "thirty two mcb",
+        "32 mcb", "battis mcb", "do mcb battis"
+      ],
+      "stock_qty": 100,
+      "substitute_sku": "MCB-16A"
+    },
+    {
+      "sku": "MCB-16A",
+      "name": "MCB 16 Amp",
+      "brand": "Havells",
+      "unit": "piece",
+      "aliases": ["mcb 16", "16 amp mcb"],
+      "stock_qty": 80,
+      "substitute_sku": null
+    },
+    {
+      "sku": "PVC-PIPE-1",
+      "name": "PVC Pipe 1 inch",
+      "brand": "Supreme",
+      "unit": "piece",
+      "aliases": ["pvc pipe", "pipe 1 inch", "1 inch pipe", "nal", "pipe", "ek inch nal"],
+      "stock_qty": 5,
+      "substitute_sku": "PVC-PIPE-0.75"
+    },
+    {
+      "sku": "PVC-PIPE-05",
+      "name": "PVC Pipe 1/2 inch",
+      "brand": "Supreme",
+      "unit": "piece",
+      "aliases": [
+        "half inch pipe", "1/2 inch pipe", "1/2 inch nal", "half inch nal",
+        "aadha inch nal", "aadhi inch nal", "nal half", "half inch plate",
+        "1/2 inch ki plate", "teen half inch"
+      ],
+      "stock_qty": 80,
+      "substitute_sku": "PVC-PIPE-0.75"
+    },
+    {
+      "sku": "PVC-PIPE-0.75",
+      "name": "PVC Pipe 3/4 inch",
+      "brand": "Astral",
+      "unit": "piece",
+      "aliases": ["pipe 3/4", "3/4 pipe", "chhoti pipe", "teen quarter pipe"],
+      "stock_qty": 60,
+      "substitute_sku": null
+    },
+    {
+      "sku": "GI-ELBOW-075",
+      "name": "GI Elbow 3/4 inch",
+      "brand": "Generic",
+      "unit": "piece",
+      "aliases": ["gi elbow", "elbow", "koniya", "3/4 elbow"],
+      "stock_qty": 200,
+      "substitute_sku": null
+    },
+    {
+      "sku": "PUTTY-40KG",
+      "name": "Wall Putty 40kg",
+      "brand": "Birla",
+      "unit": "bag",
+      "aliases": ["putty", "wall putty", "putty 40", "birla putty"],
+      "stock_qty": 30,
+      "substitute_sku": null
+    },
+    {
+      "sku": "DRILL-BIT-SET",
+      "name": "Drill Bit Set",
+      "brand": "Bosch",
+      "unit": "box",
+      "aliases": ["drill bits", "drill bit", "bosch bits", "bit set"],
+      "stock_qty": 15,
+      "substitute_sku": null
+    },
+    {
+      "sku": "SWITCH-6A",
+      "name": "Switch 6 Amp",
+      "brand": "Anchor",
+      "unit": "piece",
+      "aliases": ["switch", "switch 6a", "light switch", "anchor switch"],
+      "stock_qty": 500,
+      "substitute_sku": null
+    }
+  ],
+  "orders": [
+    {
+      "order_id": "ORD-1001",
+      "retailer_id": "R01",
+      "phone": "+919571025342",
+      "created_at": "2026-10-10T10:30:00+05:30",
+      "status": "delivered",
+      "eta_text": "Delivered 12 Oct",
+      "eta_date": "2026-10-12",
+      "total_amount": 4850,
+      "items": [
+        { "sku": "WIRE-CU-1.5", "name": "Copper Wire 1.5mm", "qty": 2, "unit": "coil" },
+        { "sku": "MCB-32A", "name": "MCB 32 Amp", "qty": 10, "unit": "piece" }
+      ]
+    },
+    {
+      "order_id": "ORD-1002",
+      "retailer_id": "R01",
+      "phone": "+919571025342",
+      "created_at": "2026-10-17T11:00:00+05:30",
+      "status": "delivered",
+      "eta_text": "Delivered 18 Oct",
+      "eta_date": "2026-10-18",
+      "total_amount": 2100,
+      "items": [
+        { "sku": "SWITCH-6A", "name": "Switch 6 Amp", "qty": 50, "unit": "piece" },
+        { "sku": "MCB-16A", "name": "MCB 16 Amp", "qty": 5, "unit": "piece" }
+      ]
+    },
+    {
+      "order_id": "ORD-1003",
+      "retailer_id": "R02",
+      "phone": "+919876543211",
+      "created_at": "2026-10-18T09:15:00+05:30",
+      "status": "dispatched",
+      "eta_text": "Delivery by 25 Oct afternoon",
+      "eta_date": "2026-10-25",
+      "total_amount": 3200,
+      "items": [
+        { "sku": "PVC-PIPE-1", "name": "PVC Pipe 1 inch", "qty": 20, "unit": "piece" },
+        { "sku": "GI-ELBOW-075", "name": "GI Elbow 3/4 inch", "qty": 40, "unit": "piece" }
+      ]
+    },
+    {
+      "order_id": "ORD-1004",
+      "retailer_id": "R03",
+      "phone": "+919876543212",
+      "created_at": "2026-10-15T16:00:00+05:30",
+      "status": "delivered",
+      "eta_text": "Delivered 16 Oct",
+      "eta_date": "2026-10-16",
+      "total_amount": 1800,
+      "items": [
+        { "sku": "DRILL-BIT-SET", "name": "Drill Bit Set", "qty": 3, "unit": "box" }
+      ]
+    },
+    {
+      "order_id": "ORD-1005",
+      "retailer_id": "R04",
+      "phone": "+919876543213",
+      "created_at": "2026-10-19T14:20:00+05:30",
+      "status": "packed",
+      "eta_text": "Dispatch tomorrow, delivery 26 Oct",
+      "eta_date": "2026-10-26",
+      "total_amount": 4500,
+      "items": [
+        { "sku": "PUTTY-40KG", "name": "Wall Putty 40kg", "qty": 10, "unit": "bag" }
+      ]
+    },
+    {
+      "order_id": "ORD-1006",
+      "retailer_id": "R01",
+      "phone": "+919571025342",
+      "created_at": "2026-10-26T18:46:45+05:30",
+      "status": "confirmed",
+      "eta_text": "Expected delivery by 28 Oct afternoon",
+      "eta_date": "2026-10-28",
+      "total_amount": null,
+      "items": [
+        { "sku": "MCB-32A", "name": "MCB 32 Amp", "qty": 2, "unit": "piece" }
+      ],
+      "confirmed_by_voice": true
+    }
+  ],
+  "whatsapp_outbox": []
+}

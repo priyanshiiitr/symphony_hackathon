@@ -1,0 +1,125 @@
+{
+  "_comment": "FLAT params only. function_call on graph nodes forces tool_choice.",
+  "tools": [
+    {
+      "key": "custom_task",
+      "name": "get_last_order",
+      "description": "Fetch last hardware order for retailer_id. Only if last_order_summary is empty.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "retailer_id": { "type": "string", "description": "Retailer id like R01" }
+        },
+        "required": ["retailer_id"]
+      },
+      "pre_call_message": "Ek second, pichla order dekh raha hoon…",
+      "method": "POST"
+    },
+    {
+      "key": "custom_task",
+      "name": "check_stock",
+      "description": "Check warehouse stock for ONE product. Pass retailer_id, sku_or_name (e.g. MCB 32 Amp), and qty as a number string (e.g. 2).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "retailer_id": { "type": "string", "description": "e.g. R01" },
+          "sku_or_name": {
+            "type": "string",
+            "description": "Product name e.g. MCB 32 Amp"
+          },
+          "qty": {
+            "type": "string",
+            "description": "Quantity as digits e.g. 2"
+          }
+        },
+        "required": ["retailer_id", "sku_or_name", "qty"]
+      },
+      "pre_call_message": "Stock check kar raha hoon, thoda rukiye…",
+      "method": "POST"
+    },
+    {
+      "key": "custom_task",
+      "name": "create_order",
+      "description": "Create order for ONE product after voice yes. Pass retailer_id, sku_or_name, qty, confirmed_by_voice true.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "retailer_id": { "type": "string" },
+          "sku_or_name": { "type": "string" },
+          "qty": { "type": "string" },
+          "confirmed_by_voice": { "type": "boolean" }
+        },
+        "required": ["retailer_id", "sku_or_name", "qty", "confirmed_by_voice"]
+      },
+      "pre_call_message": "Order book kar raha hoon…",
+      "method": "POST"
+    },
+    {
+      "key": "custom_task",
+      "name": "send_whatsapp_confirmation",
+      "description": "Send WhatsApp after order created. Use retailer_phone, order_id, summary_text.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "retailer_phone": { "type": "string" },
+          "order_id": { "type": "string" },
+          "summary_text": { "type": "string" }
+        },
+        "required": ["retailer_phone", "order_id", "summary_text"]
+      },
+      "pre_call_message": "WhatsApp confirmation bhej raha hoon…",
+      "method": "POST"
+    }
+  ],
+  "tools_params": {
+    "get_last_order": {
+      "url": "{{BASE_URL}}/v1/retailers/last-order",
+      "method": "POST",
+      "param": { "retailer_id": "%(retailer_id)s" },
+      "headers": { "Content-Type": "application/json" },
+      "scope": "node",
+      "nodes": ["welcome_recall"],
+      "pre_call_message": "Ek second, pichla order dekh raha hoon…"
+    },
+    "check_stock": {
+      "url": "{{BASE_URL}}/v1/stock/check",
+      "method": "POST",
+      "param": {
+        "retailer_id": "%(retailer_id)s",
+        "sku_or_name": "%(sku_or_name)s",
+        "qty": "%(qty)s"
+      },
+      "headers": { "Content-Type": "application/json" },
+      "scope": "node",
+      "nodes": ["check_stock", "adjust_unavailable"],
+      "pre_call_message": "Stock check kar raha hoon, thoda rukiye…"
+    },
+    "create_order": {
+      "url": "{{BASE_URL}}/v1/orders",
+      "method": "POST",
+      "param": {
+        "retailer_id": "%(retailer_id)s",
+        "sku_or_name": "%(sku_or_name)s",
+        "qty": "%(qty)s",
+        "confirmed_by_voice": "%(confirmed_by_voice)s"
+      },
+      "headers": { "Content-Type": "application/json" },
+      "scope": "node",
+      "nodes": ["create_order"],
+      "pre_call_message": "Order book kar raha hoon…"
+    },
+    "send_whatsapp_confirmation": {
+      "url": "{{BASE_URL}}/v1/whatsapp/send",
+      "method": "POST",
+      "param": {
+        "retailer_phone": "%(retailer_phone)s",
+        "order_id": "%(order_id)s",
+        "summary_text": "%(summary_text)s"
+      },
+      "headers": { "Content-Type": "application/json" },
+      "scope": "node",
+      "nodes": ["closing_whatsapp"],
+      "pre_call_message": "WhatsApp confirmation bhej raha hoon…"
+    }
+  }
+}

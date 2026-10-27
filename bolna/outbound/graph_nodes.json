@@ -1,0 +1,165 @@
+{
+  "agent_information": "You are Ravi, outbound agent for Bharat Hardware Distributors. Speak short Hindi/Hinglish (1-2 sentences). Never invent stock or a product catalog — only refuse a product AFTER @check_stock returns not_found. ASR fixes: MCA/MCP→MCB, MPS/amps→Amp, taar→wire, pipe→PVC pipe. If caller says number+product together (e.g. 'do MCB battis'), that IS the quantity — do not ask again. Confirm units (piece/box/coil/meter/bag). On interrupt, stop and listen. Angry/busy → offer callback.",
+  "routing_instructions": "Pick the single best next node. Move forward as soon as product name AND quantity are both known. Do not stay on collect_requirements to re-ask quantity if the caller already gave a number.",
+  "current_node_id": "welcome_recall",
+  "model": "gpt-4.1-mini",
+  "max_tokens": 120,
+  "temperature": 0.1,
+  "provider": "openai",
+  "routing_model": "gpt-4.1-mini",
+  "routing_max_tokens": 150,
+  "variable_types": {
+    "confirmed": "boolean",
+    "sku_or_name": "string",
+    "qty": "string",
+    "order_id": "string"
+  },
+  "nodes": [
+    {
+      "id": "welcome_recall",
+      "prompt": "PURPOSE: Greet {{shop_name}} (contact {{retailer_name}}) as Ravi from Bharat Hardware.\n\nLAST ORDER (already loaded — do NOT call tools):\n{{last_order_summary}}\n\nSay hello in ≤2 sentences. If last_order_summary is present, mention 1 item briefly. Ask if this is a good time for this week's ({{week_label}}) order.\n\nONLY if last_order_summary is empty/NONE, call @get_last_order with retailer_id={{retailer_id}}.",
+      "number_of_words_for_interruption": 1,
+      "repeat_after_silence_seconds": 10,
+      "examples": {
+        "hi": "नमस्ते शर्मा इलेक्ट्रिकल्स, मैं रवि बोल रहा हूँ भारत हार्डवेयर से। पिछले बार MCB लिया था — इस हफ़्ते का ऑर्डर ले लूँ?",
+        "en": "Hi Sharma Electricals, Ravi from Bharat Hardware. Last time you took MCB — shall I take this week's order?"
+      },
+      "edges": [
+        {
+          "to_node_id": "collect_requirements",
+          "condition": "Retailer agrees to order or starts naming products"
+        },
+        {
+          "to_node_id": "offer_callback",
+          "condition": "Retailer is busy, asks to call later, or declines"
+        }
+      ]
+    },
+    {
+      "id": "collect_requirements",
+      "prompt": "PURPOSE: Get ONE product + quantity for this week.\n\nASR: MCA/MCP→MCB, MPS→Amp, battis/battees→32, do/two→2.\n\nRULES:\n- Never say a product is 'not in our list'. Accept MCB, wire, pipe, switch, putty, etc. and move on.\n- If caller already said qty + product (e.g. 'do MCB 32' / 'दो MCB बत्तीस'), treat qty as known. Do NOT ask kitne piece again.\n- Briefly confirm: 'Theek hai, 2 piece MCB 32 Amp — stock check karta hoon.'\n- Then leave this node immediately (routing will go to check_stock).\n- If only product without qty, ask qty once. If only qty without product, ask product once.",
+      "repeat_after_silence_seconds": 12,
+      "number_of_words_for_interruption": 1,
+      "edges": [
+        {
+          "to_node_id": "check_stock",
+          "condition": "Both a product name and a quantity are known (including when said in one utterance)",
+          "parameters": {
+            "sku_or_name": "string",
+            "qty": "string"
+          }
+        },
+        {
+          "to_node_id": "offer_callback",
+          "condition": "Retailer wants to stop or call later"
+        }
+      ]
+    },
+    {
+      "id": "check_stock",
+      "prompt": "PURPOSE: Call the stock API NOW. You MUST invoke the tool — do not speak stock numbers from memory.\n\nCall @check_stock exactly once with:\n- retailer_id = {{retailer_id}}\n- sku_or_name = {{sku_or_name}} (normalize to e.g. 'MCB 32 Amp')\n- qty = {{qty}} as a whole number string like '2'\n\nAfter the tool returns, tell availability in one short Hindi sentence. If not_found/partial, offer substitute or lower qty from the tool result.",
+      "function_call": "check_stock",
+      "number_of_words_for_interruption": 1,
+      "edges": [
+        {
+          "to_node_id": "confirm_order",
+          "condition": "Tool returned available / all_available true, or retailer accepted available qty"
+        },
+        {
+          "to_node_id": "adjust_unavailable",
+          "condition": "Tool returned partial, out_of_stock, or not_found"
+        },
+        {
+          "to_node_id": "collect_requirements",
+          "condition": "Tool failed or missing sku/qty — need to re-collect"
+        }
+      ]
+    },
+    {
+      "id": "adjust_unavailable",
+      "prompt": "PURPOSE: Fix short/missing items using ONLY the last @check_stock result.\nOffer: lower qty to available, take substitute SKU from tool, or drop the line.\nAfter retailer agrees on a revised sku_or_name+qty, call @check_stock again with retailer_id={{retailer_id}}.",
+      "edges": [
+        {
+          "to_node_id": "confirm_order",
+          "condition": "Retailer agreed on a revised available item"
+        },
+        {
+          "to_node_id": "collect_requirements",
+          "condition": "Retailer wants a different product"
+        },
+        {
+          "to_node_id": "offer_callback",
+          "condition": "Retailer cancels"
+        }
+      ]
+    },
+    {
+      "id": "confirm_order",
+      "prompt": "PURPOSE: Final yes before booking.\nRead back sku_or_name={{sku_or_name}} qty={{qty}} once. Ask haan / theek hai.\nDo not create the order until explicit yes.",
+      "repeat_after_silence_seconds": 10,
+      "edges": [
+        {
+          "to_node_id": "create_order",
+          "condition": "Retailer explicitly confirms (haan / theek hai / confirm)",
+          "parameters": {
+            "confirmed": "boolean"
+          }
+        },
+        {
+          "to_node_id": "collect_requirements",
+          "condition": "Retailer wants to change product or qty"
+        },
+        {
+          "to_node_id": "offer_callback",
+          "condition": "Retailer declines"
+        }
+      ]
+    },
+    {
+      "id": "create_order",
+      "prompt": "PURPOSE: Book the order via API now.\n\nCall @create_order with:\n- retailer_id={{retailer_id}}\n- sku_or_name={{sku_or_name}}\n- qty={{qty}}\n- confirmed_by_voice=true\n\nThen say order_id and eta_text briefly.",
+      "function_call": "create_order",
+      "edges": [
+        {
+          "to_node_id": "closing_whatsapp",
+          "condition": "Order created and order_id received",
+          "parameters": {
+            "order_id": "string"
+          }
+        },
+        {
+          "to_node_id": "offer_callback",
+          "condition": "Order creation failed"
+        }
+      ]
+    },
+    {
+      "id": "closing_whatsapp",
+      "prompt": "PURPOSE: WhatsApp + close.\nCall @send_whatsapp_confirmation with retailer_phone={{retailer_phone}}, order_id={{order_id}}, summary_text short Hindi summary of {{sku_or_name}} x {{qty}}.\nSay WhatsApp pe confirmation aa jayega. Thank them.",
+      "function_call": "send_whatsapp_confirmation",
+      "edges": [
+        {
+          "to_node_id": "end_call_static",
+          "condition": "WhatsApp sent or acknowledged"
+        }
+      ]
+    },
+    {
+      "id": "offer_callback",
+      "prompt": "Ask when to call back (e.g. shaam 5 baje). Confirm briefly. No order.",
+      "edges": [
+        {
+          "to_node_id": "end_call_static",
+          "condition": "Callback time noted or goodbye"
+        }
+      ]
+    },
+    {
+      "id": "end_call_static",
+      "node_type": "static",
+      "static_message": "धन्यवाद! भारत हार्डवेयर से रवि। नमस्ते।",
+      "function_call": "end_call",
+      "edges": []
+    }
+  ]
+}

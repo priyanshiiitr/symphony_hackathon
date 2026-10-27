@@ -1,0 +1,36 @@
+# Python
+backend/.venv/
+**/__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Secrets / local env
+.env
+.env.*
+!.env.example
+**/BOLNA_API_KEY*
+*.pem
+*.key
+
+# Local runtime / tunnel
+scripts/PUBLIC_URL.txt
+scripts/tunnel*.log
+scripts/bin/cloudflared.exe
+scripts/*.log
+
+# Bolna debug dumps (large / transient)
+bolna/**/last_exec*.json
+bolna/**/last_raw_logs.json
+bolna/**/last_execution.json
+bolna/**/agent_payload.json
+bolna/**/_phone_id.tmp
+
+# IDE / OS
+.cursor/
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+Desktop.ini
+.DS_Store

@@ -1,0 +1,61 @@
+{
+  "agent_config": {
+    "agent_name": "TradeCall Outbound Hardware",
+    "agent_type": "other",
+    "agent_welcome_message": "नमस्ते {{shop_name}}, मैं रवि बोल रहा हूँ भारत हार्डवेयर डिस्ट्रीब्यूटर्स से।",
+    "tasks": [
+      {
+        "task_type": "conversation",
+        "toolchain": {
+          "execution": "parallel",
+          "pipelines": [["transcriber", "llm", "synthesizer"]]
+        },
+        "task_config": {
+          "optimize_latency": true,
+          "call_terminate": 480,
+          "hangup_after_LLMCall": false,
+          "hangup_after_silence": 20,
+          "number_of_words_for_interruption": 1
+        },
+        "tools_config": {
+          "input": { "format": "wav", "provider": "plivo" },
+          "output": { "format": "wav", "provider": "plivo" },
+          "api_tools": {
+            "tools": [],
+            "tools_params": {}
+          },
+          "llm_agent": {
+            "agent_type": "graph_agent",
+            "agent_flow_type": "streaming",
+            "llm_config": {}
+          },
+          "transcriber": {
+            "provider": "deepgram",
+            "model": "nova-3",
+            "language": "multi-hi",
+            "stream": true,
+            "encoding": "linear16",
+            "sampling_rate": 16000,
+            "endpointing": 400,
+            "keywords": "MCB,Havells,Polycab,putty,PVC,wire,taar,pipe,Switch,Bosch,Astral,Supreme"
+          },
+          "synthesizer": {
+            "provider": "sarvam",
+            "stream": true,
+            "buffer_size": 220,
+            "audio_format": "wav",
+            "provider_config": {
+              "voice_id": "suhani",
+              "model": "bulbul:v3"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "agent_prompts": {
+    "task_1": {
+      "system_prompt": "You are Ravi from Bharat Hardware Distributors. Follow the graph node instructions. Keep replies short."
+    }
+  }
+}

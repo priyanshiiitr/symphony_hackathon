@@ -1,0 +1,66 @@
+{
+  "_comment": "Inbound flat POST tools. from_number comes from Bolna system vars.",
+  "tools": [
+    {
+      "key": "custom_task",
+      "name": "lookup_retailer_by_phone",
+      "description": "Identify hardware retailer from caller phone E.164. Pass phone like +919571025342.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "description": "Caller phone E.164"
+          }
+        },
+        "required": ["phone"]
+      },
+      "pre_call_message": "Ek second, aapka number check kar raha hoon…",
+      "method": "POST"
+    },
+    {
+      "key": "custom_task",
+      "name": "get_order_status",
+      "description": "Get live order status and ETA. Pass order_id like ORD-1006 and phone for ownership.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "order_id": {
+            "type": "string",
+            "description": "e.g. ORD-1006"
+          },
+          "phone": {
+            "type": "string",
+            "description": "Caller phone for ownership check"
+          }
+        },
+        "required": ["order_id"]
+      },
+      "pre_call_message": "Order status dekh raha hoon…",
+      "method": "POST"
+    }
+  ],
+  "tools_params": {
+    "lookup_retailer_by_phone": {
+      "url": "{{BASE_URL}}/v1/retailers/lookup-by-phone",
+      "method": "POST",
+      "param": { "phone": "%(phone)s" },
+      "headers": { "Content-Type": "application/json" },
+      "scope": "node",
+      "nodes": ["identify_retailer"],
+      "pre_call_message": "Ek second, aapka number check kar raha hoon…"
+    },
+    "get_order_status": {
+      "url": "{{BASE_URL}}/v1/orders/status",
+      "method": "POST",
+      "param": {
+        "order_id": "%(order_id)s",
+        "phone": "%(phone)s"
+      },
+      "headers": { "Content-Type": "application/json" },
+      "scope": "node",
+      "nodes": ["speak_status_eta"],
+      "pre_call_message": "Order status dekh raha hoon…"
+    }
+  }
+}
