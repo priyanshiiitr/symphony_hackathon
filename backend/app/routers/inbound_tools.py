@@ -17,6 +17,7 @@ from app.store import (
     get_open_orders_summary,
     get_order_status,
     get_retailer_by_phone,
+    lookup_status_flexible,
     order_status_payload,
     get_orders_for_retailer,
 )
@@ -34,6 +35,14 @@ class OrderStatusIn(BaseModel):
         default=None,
         description="Optional caller phone for ownership check",
     )
+
+
+class LookupStatusIn(BaseModel):
+    """Outbound mid-call: status by order_id OR phone/retailer_id (latest open)."""
+
+    order_id: str | None = Field(default=None, description="e.g. ORD-1006")
+    phone: str | None = Field(default=None, description="Retailer phone")
+    retailer_id: str | None = Field(default=None, description="e.g. R01")
 
 
 def _retailer_context(phone: str) -> dict[str, Any]:
@@ -80,6 +89,24 @@ def post_order_status(body: OrderStatusIn) -> dict[str, Any]:
     """
     try:
         return get_order_status(body.order_id, phone=body.phone)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+
+
+@router.post("/orders/lookup-status")
+def post_lookup_status(body: LookupStatusIn) -> dict[str, Any]:
+    """
+    Outbound Bolna tool: answer status mid-call by order_id or retailer phone.
+    If only phone/retailer_id, returns the latest open (or most recent) order.
+    """
+    try:
+        return lookup_status_flexible(
+            order_id=body.order_id,
+            phone=body.phone,
+            retailer_id=body.retailer_id,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except PermissionError as exc:

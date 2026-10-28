@@ -21,6 +21,21 @@ from app.store import (
     get_retailers,
 )
 
+
+def _last_order_brief(retailer_id: str) -> dict[str, Any] | None:
+    order = get_last_order(retailer_id)
+    if order is None:
+        return None
+    return {
+        "order_id": order["order_id"],
+        "status": order.get("status"),
+        "created_at": order.get("created_at"),
+        "items_summary": ", ".join(
+            f"{i.get('qty')} {i.get('unit')} {i.get('name')}"
+            for i in order.get("items", [])
+        ),
+    }
+
 router = APIRouter(prefix="/v1", tags=["retailers"])
 
 
@@ -32,7 +47,11 @@ def list_retailers():
     Returns every hardware shop in our seed data.
     Used later by the ops console "retailer list".
     """
-    retailers = get_retailers()
+    retailers = []
+    for r in get_retailers():
+        row = dict(r)
+        row["last_order"] = _last_order_brief(r["id"])
+        retailers.append(row)
     return {"count": len(retailers), "retailers": retailers}
 
 

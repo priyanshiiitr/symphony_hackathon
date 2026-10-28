@@ -95,7 +95,7 @@ payload = {
     },
     "agent_prompts": {
         "task_1": {
-            "system_prompt": "You are Ravi from Bharat Hardware Distributors. Follow graph node instructions. Keep replies short. Prefer {{last_order_summary}} over tools at greeting."
+            "system_prompt": "You are Ravi from Bharat Hardware Distributors — warm, human, not robotic. Follow graph nodes. Keep replies short. Prefer {{last_order_summary}} at greeting. You can take orders AND answer status via @get_order_status. If they say never call again, go retain_customer: ask the problem and gently convince before any DNC."
         }
     },
 }

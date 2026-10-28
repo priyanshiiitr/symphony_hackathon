@@ -8,7 +8,14 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field, model_validator
 
-from app.store import create_order, get_order, get_order_status, update_order_status
+from app.store import (
+    create_order,
+    get_order,
+    get_order_status,
+    list_orders,
+    status_pipeline,
+    update_order_status,
+)
 
 router = APIRouter(prefix="/v1", tags=["orders"])
 
@@ -53,6 +60,20 @@ class UpdateStatusIn(BaseModel):
     status: str
     eta_text: str | None = None
     eta_date: str | None = None
+
+
+@router.get("/orders")
+def get_orders(
+    retailer_id: str | None = Query(default=None),
+    limit: int = Query(default=40, ge=1, le=200),
+) -> dict[str, Any]:
+    """List orders newest-first for the ops console."""
+    orders = list_orders(retailer_id=retailer_id, limit=limit)
+    return {
+        "count": len(orders),
+        "status_pipeline": status_pipeline(),
+        "orders": orders,
+    }
 
 
 @router.post("/orders")

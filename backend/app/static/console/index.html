@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TradeCall — Ops</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Syne:wght@600;700;800&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/console/styles.css" />
+</head>
+<body>
+  <div class="noise" aria-hidden="true"></div>
+  <header class="top">
+    <div class="brand-block">
+      <p class="eyebrow">Bharat Hardware Distributors</p>
+      <h1 class="brand">TradeCall</h1>
+    </div>
+    <div class="top-meta">
+      <span id="healthPill" class="pill">checking…</span>
+      <button type="button" id="btnAgents" class="btn ghost">Agents</button>
+      <button type="button" id="btnRefresh" class="btn ghost">Refresh</button>
+    </div>
+  </header>
+
+  <section id="agentsPanel" class="agents-panel" hidden aria-labelledby="agentsTitle">
+    <div class="agents-head">
+      <div>
+        <h2 id="agentsTitle">Voice agents</h2>
+        <p class="hint">Customize deployed agents or create a new outbound/inbound agent for your distributor line.</p>
+      </div>
+      <button type="button" id="btnNewAgent" class="btn primary">Make new agent</button>
+    </div>
+    <div class="agents-grid">
+      <ul id="agentList" class="agent-list"></ul>
+      <form id="agentForm" class="agent-form">
+        <h3 id="agentFormTitle">Customize agent</h3>
+        <input type="hidden" id="agentEditId" />
+        <label>Name <input id="agentName" type="text" required /></label>
+        <label>Role
+          <select id="agentRole" class="select">
+            <option value="outbound">Outbound (order-taking)</option>
+            <option value="inbound">Inbound (status / ETA)</option>
+          </select>
+        </label>
+        <label>Welcome message
+          <textarea id="agentWelcome" rows="2" placeholder="नमस्ते {{shop_name}}, मैं रवि…"></textarea>
+        </label>
+        <label>System prompt
+          <textarea id="agentSystem" rows="4" placeholder="You are Ravi…"></textarea>
+        </label>
+        <label class="check">
+          <input type="checkbox" id="agentDefault" />
+          Set as default for Call now / inbound (writes AGENT_ID.txt)
+        </label>
+        <p id="agentFormStatus" class="call-status" hidden></p>
+        <div class="agent-actions">
+          <button type="submit" id="btnSaveAgent" class="btn primary">Save</button>
+          <button type="button" id="btnCancelAgent" class="btn ghost">Cancel create</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <main class="workspace">
+    <section class="panel retailers" aria-labelledby="retailersTitle">
+      <div class="panel-head">
+        <h2 id="retailersTitle">Retailers</h2>
+        <p class="hint">Select a shop, then place an outbound call.</p>
+      </div>
+      <ul id="retailerList" class="retailer-list"></ul>
+    </section>
+
+    <section class="panel focus" aria-labelledby="focusTitle">
+      <div class="panel-head row">
+        <div>
+          <h2 id="focusTitle">Route call</h2>
+          <p id="selectedLabel" class="hint">No retailer selected</p>
+        </div>
+        <button type="button" id="btnCall" class="btn primary" disabled>Call now</button>
+      </div>
+      <p id="callStatus" class="call-status" hidden></p>
+
+      <div class="order-block">
+        <div class="panel-head row">
+          <h2>Order</h2>
+          <select id="orderSelect" class="select"></select>
+        </div>
+        <article id="orderCard" class="order-card empty">
+          <p class="muted">Pick an order to inspect.</p>
+        </article>
+        <div class="scrubber">
+          <p class="scrubber-label">Status scrubber</p>
+          <div id="statusPipeline" class="pipeline"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel outbox" aria-labelledby="waTitle">
+      <div class="panel-head">
+        <h2 id="waTitle">WhatsApp outbox</h2>
+        <p class="hint">Mock confirmations after voice orders.</p>
+      </div>
+      <ul id="waList" class="wa-list"></ul>
+      <div class="panel-head" style="margin-top:1rem">
+        <h2>Callbacks</h2>
+        <p class="hint">Busy → call-later dispositions (Phase E).</p>
+      </div>
+      <ul id="cbList" class="wa-list"></ul>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <span>Inbound demo line <code>+918064261996</code></span>
+    <span id="clock"></span>
+  </footer>
+
+  <script src="/console/app.js"></script>
+</body>
+</html>

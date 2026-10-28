@@ -1,6 +1,15 @@
 # TradeCall Backend
 
-Phase A of TradeCall — hardware distributor mock ERP.
+Mock hardware ERP + **ops console** (Phase D).
+
+## Ops console
+
+With the API running:
+
+- http://127.0.0.1:8000/console/
+- or http://127.0.0.1:8000/
+
+Set `BOLNA_API_KEY` on the **uvicorn process** so **Call now** can dial via Bolna.
 
 ## Public tunnel (needed before Bolna)
 

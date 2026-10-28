@@ -107,8 +107,11 @@
       "name": "PVC Pipe 1 inch",
       "brand": "Supreme",
       "unit": "piece",
-      "aliases": ["pvc pipe", "pipe 1 inch", "1 inch pipe", "nal", "pipe", "ek inch nal"],
-      "stock_qty": 5,
+      "aliases": [
+        "pvc pipe", "pipe 1 inch", "1 inch pipe", "nal", "pipe", "ek inch nal",
+        "ek inch pipe", "one inch pipe", "pvc 1"
+      ],
+      "stock_qty": 0,
       "substitute_sku": "PVC-PIPE-0.75"
     },
     {
@@ -254,5 +257,6 @@
       "confirmed_by_voice": true
     }
   ],
-  "whatsapp_outbox": []
+  "whatsapp_outbox": [],
+  "callbacks": []
 }

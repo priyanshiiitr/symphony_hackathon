@@ -69,6 +69,59 @@
       },
       "pre_call_message": "WhatsApp confirmation bhej raha hoon…",
       "method": "POST"
+    },
+    {
+      "key": "custom_task",
+      "name": "get_order_status",
+      "description": "Look up order status and ETA. Pass order_id if known (e.g. ORD-1006), OR phone, OR retailer_id to get latest open order. Speak status_label_hi and eta_text from the tool result — never invent.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "order_id": {
+            "type": "string",
+            "description": "Order id like ORD-1006 if caller said it"
+          },
+          "phone": {
+            "type": "string",
+            "description": "Retailer phone if looking up by number"
+          },
+          "retailer_id": {
+            "type": "string",
+            "description": "Retailer id like R01"
+          }
+        },
+        "required": []
+      },
+      "pre_call_message": "Order status check kar raha hoon…",
+      "method": "POST"
+    },
+    {
+      "key": "custom_task",
+      "name": "log_callback",
+      "description": "Log callback (busy) OR do-not-call. For busy: callback_slot=time, reason=busy, disposition=callback. For never-call-again after retention fails: callback_slot=do_not_call, reason=their complaint summary, disposition=dnc. If they agree to stay: disposition=retained, reason=what convinced them.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "retailer_id": { "type": "string" },
+          "phone": { "type": "string" },
+          "shop_name": { "type": "string" },
+          "callback_slot": {
+            "type": "string",
+            "description": "When to call back, or do_not_call"
+          },
+          "reason": {
+            "type": "string",
+            "description": "busy | complaint text | retention note"
+          },
+          "disposition": {
+            "type": "string",
+            "description": "callback | dnc | retained"
+          }
+        },
+        "required": ["callback_slot"]
+      },
+      "pre_call_message": "Note kar raha hoon…",
+      "method": "POST"
     }
   ],
   "tools_params": {
@@ -120,6 +173,35 @@
       "scope": "node",
       "nodes": ["closing_whatsapp"],
       "pre_call_message": "WhatsApp confirmation bhej raha hoon…"
+    },
+    "get_order_status": {
+      "url": "{{BASE_URL}}/v1/orders/lookup-status",
+      "method": "POST",
+      "param": {
+        "order_id": "%(order_id)s",
+        "phone": "%(phone)s",
+        "retailer_id": "%(retailer_id)s"
+      },
+      "headers": { "Content-Type": "application/json" },
+      "scope": "node",
+      "nodes": ["speak_status"],
+      "pre_call_message": "Order status check kar raha hoon…"
+    },
+    "log_callback": {
+      "url": "{{BASE_URL}}/v1/callbacks",
+      "method": "POST",
+      "param": {
+        "retailer_id": "%(retailer_id)s",
+        "phone": "%(phone)s",
+        "shop_name": "%(shop_name)s",
+        "callback_slot": "%(callback_slot)s",
+        "reason": "%(reason)s",
+        "disposition": "%(disposition)s"
+      },
+      "headers": { "Content-Type": "application/json" },
+      "scope": "node",
+      "nodes": ["offer_callback", "retain_customer"],
+      "pre_call_message": "Note kar raha hoon…"
     }
   }
 }

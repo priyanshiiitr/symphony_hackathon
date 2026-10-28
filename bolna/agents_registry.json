@@ -1,0 +1,16 @@
+{
+  "agents": [
+    {
+      "role": "outbound",
+      "agent_id": "576128ab-85dc-454e-ae72-052ff8066a52",
+      "name": "TradeCall Outbound Hardware",
+      "label": "Outbound order-taking"
+    },
+    {
+      "role": "inbound",
+      "agent_id": "adf77833-17d4-4178-ac30-c5980742aa95",
+      "name": "TradeCall Inbound Status",
+      "label": "Inbound status / ETA"
+    }
+  ]
+}

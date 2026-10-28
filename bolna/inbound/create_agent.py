@@ -55,8 +55,9 @@ def build_payload() -> dict:
                         "inbound_limit": -1,
                     },
                     "tools_config": {
-                        "input": {"format": "wav", "provider": "plivo"},
-                        "output": {"format": "wav", "provider": "plivo"},
+                        # Number is VoBiz — Plivo I/O here causes 2s "End Of XML" hangups
+                        "input": {"format": "wav", "provider": "vobiz"},
+                        "output": {"format": "wav", "provider": "vobiz"},
                         "api_tools": {
                             "tools": tools_doc["tools"],
                             "tools_params": tools_params,

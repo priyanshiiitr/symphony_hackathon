@@ -105,6 +105,26 @@ def get_orders_for_retailer(retailer_id: str) -> list[dict[str, Any]]:
     return orders
 
 
+def list_orders(*, retailer_id: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
+    """Newest-first order list for the ops console."""
+    orders = list(load_db()["orders"])
+    if retailer_id:
+        orders = [o for o in orders if o["retailer_id"] == retailer_id]
+    orders.sort(key=lambda o: o.get("created_at", ""), reverse=True)
+    return orders[: max(1, limit)]
+
+
+def status_pipeline() -> list[str]:
+    """Demo scrubber order (excludes cancelled)."""
+    return [
+        "confirmed",
+        "packed",
+        "dispatched",
+        "out_for_delivery",
+        "delivered",
+    ]
+
+
 def get_open_orders_summary(retailer_id: str) -> list[dict[str, Any]]:
     """Compact list for inbound: which orders can we talk about?"""
     out: list[dict[str, Any]] = []
@@ -483,4 +503,76 @@ def list_whatsapp_outbox() -> list[dict[str, Any]]:
     box = list(load_db()["whatsapp_outbox"])
     box.sort(key=lambda m: m.get("sent_at", ""), reverse=True)
     return box
+
+
+def _ensure_callbacks() -> list[dict[str, Any]]:
+    db = load_db()
+    if "callbacks" not in db:
+        db["callbacks"] = []
+    return db["callbacks"]
+
+
+def log_callback(
+    *,
+    retailer_id: str | None,
+    phone: str | None,
+    shop_name: str | None,
+    callback_slot: str,
+    reason: str | None = None,
+    disposition: str | None = None,
+) -> dict[str, Any]:
+    """Busy → callback, or DNC / do-not-call retention notes for the ops console."""
+    disp = (disposition or "callback").strip().lower()
+    row = {
+        "id": f"CB-{len(_ensure_callbacks()) + 1:04d}",
+        "retailer_id": retailer_id,
+        "phone": phone,
+        "shop_name": shop_name,
+        "callback_slot": callback_slot,
+        "reason": reason or ("dnc" if disp == "dnc" else "busy"),
+        "disposition": disp,
+        "created_at": datetime.now(_IST).isoformat(),
+    }
+    _ensure_callbacks().append(row)
+    return row
+
+
+def lookup_status_flexible(
+    *,
+    order_id: str | None = None,
+    phone: str | None = None,
+    retailer_id: str | None = None,
+) -> dict[str, Any]:
+    """
+    Outbound mid-call status: by order_id, or latest open order for phone/retailer_id.
+    """
+    oid = (order_id or "").strip()
+    phone = (phone or "").strip() or None
+    rid = (retailer_id or "").strip()
+    if oid:
+        return get_order_status(oid, phone=phone)
+
+    if not rid and phone:
+        retailer = get_retailer_by_phone(phone)
+        if retailer is None:
+            raise ValueError(f"No retailer found for phone {phone}")
+        rid = retailer["id"]
+    if not rid:
+        raise ValueError("Provide order_id, phone, or retailer_id")
+
+    opens = get_open_orders_summary(rid)
+    if not opens:
+        # Fall back to any latest order for the shop
+        all_orders = get_orders_for_retailer(rid)
+        if not all_orders:
+            raise ValueError(f"No orders found for retailer {rid}")
+        return order_status_payload(all_orders[0])
+
+    return get_order_status(opens[0]["order_id"], phone=phone)
+
+
+def list_callbacks() -> list[dict[str, Any]]:
+    rows = list(_ensure_callbacks())
+    rows.sort(key=lambda r: r.get("created_at", ""), reverse=True)
+    return rows
 
