@@ -14,11 +14,15 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.store import (
+    clear_call_schedule,
+    get_call_schedule,
     get_last_order,
     get_open_orders_summary,
     get_retailer,
     get_retailer_by_phone,
     get_retailers,
+    list_due_schedules,
+    set_call_schedule,
 )
 
 
@@ -51,8 +55,62 @@ def list_retailers():
     for r in get_retailers():
         row = dict(r)
         row["last_order"] = _last_order_brief(r["id"])
+        row["schedule"] = get_call_schedule(r["id"])
         retailers.append(row)
-    return {"count": len(retailers), "retailers": retailers}
+    return {
+        "count": len(retailers),
+        "retailers": retailers,
+        "due_schedules": list_due_schedules(),
+    }
+
+
+class ScheduleIn(BaseModel):
+    next_call_at: str = Field(
+        ...,
+        description="ISO datetime or datetime-local, e.g. 2026-10-29T17:30",
+    )
+    note: str | None = Field(default=None, description="e.g. Prefer shaam 5")
+    cadence: str | None = Field(
+        default="custom",
+        description="once | daily | weekly | custom",
+    )
+
+
+@router.get("/retailers/schedules/due")
+def due_schedules() -> dict[str, Any]:
+    rows = list_due_schedules()
+    return {"count": len(rows), "schedules": rows}
+
+
+@router.get("/retailers/{retailer_id}/schedule")
+def read_schedule(retailer_id: str) -> dict[str, Any]:
+    if get_retailer(retailer_id) is None:
+        raise HTTPException(status_code=404, detail=f"Retailer {retailer_id} not found")
+    schedule = get_call_schedule(retailer_id)
+    return {"retailer_id": retailer_id, "schedule": schedule}
+
+
+@router.put("/retailers/{retailer_id}/schedule")
+def put_schedule(retailer_id: str, body: ScheduleIn) -> dict[str, Any]:
+    """Distributor sets when to call this retailer (custom timeline)."""
+    try:
+        schedule = set_call_schedule(
+            retailer_id,
+            next_call_at=body.next_call_at,
+            note=body.note,
+            cadence=body.cadence,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True, "schedule": schedule}
+
+
+@router.delete("/retailers/{retailer_id}/schedule")
+def delete_schedule(retailer_id: str) -> dict[str, Any]:
+    if get_retailer(retailer_id) is None:
+        raise HTTPException(status_code=404, detail=f"Retailer {retailer_id} not found")
+    clear_call_schedule(retailer_id)
+    return {"ok": True, "retailer_id": retailer_id, "schedule": None}
 
 
 class LastOrderIn(BaseModel):

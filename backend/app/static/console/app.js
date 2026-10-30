@@ -9,6 +9,9 @@ const state = {
   agents: [],
   selectedAgentId: null,
   creatingAgent: false,
+  calls: [],
+  activeExecutionId: null,
+  pollTimer: null,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -44,23 +47,99 @@ function setHealth(ok, label) {
   el.classList.toggle("bad", !ok);
 }
 
+function formatCountdown(secondsUntil) {
+  if (secondsUntil == null) return "—";
+  const due = secondsUntil <= 0;
+  const abs = Math.abs(secondsUntil);
+  const h = Math.floor(abs / 3600);
+  const m = Math.floor((abs % 3600) / 60);
+  const s = abs % 60;
+  const core = h > 0
+    ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
+    : `${m}:${String(s).padStart(2, "0")}`;
+  return due ? (abs < 3600 ? `DUE ${core}` : `OVERDUE ${core}`) : core;
+}
+
+function liveSchedule(r) {
+  if (!r?.schedule?.next_call_at) return null;
+  const when = new Date(r.schedule.next_call_at);
+  if (Number.isNaN(when.getTime())) return r.schedule;
+  const seconds = Math.floor((when.getTime() - Date.now()) / 1000);
+  let status = "upcoming";
+  if (seconds <= 0 && seconds > -3600) status = "due";
+  else if (seconds <= -3600) status = "overdue";
+  return { ...r.schedule, seconds_until: seconds, status };
+}
+
+function toDatetimeLocalValue(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n) => String(n).padStart(2, "0");
+  // Show in local browser time for datetime-local
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 function renderRetailers() {
   const ul = $("retailerList");
   ul.innerHTML = "";
   for (const r of state.retailers) {
+    const sch = liveSchedule(r);
     const li = document.createElement("li");
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = "retailer" + (r.id === state.selectedRetailerId ? " active" : "");
+    btn.className =
+      "retailer" +
+      (r.id === state.selectedRetailerId ? " active" : "") +
+      (sch && sch.status !== "upcoming" ? " due-glow" : "");
+    const timerHtml = sch
+      ? `<div class="timer ${escapeHtml(sch.status)}">${escapeHtml(formatCountdown(sch.seconds_until))} · ${escapeHtml(sch.label || "")}</div>`
+      : `<div class="timer">No schedule</div>`;
     btn.innerHTML = `
       <div class="shop">${escapeHtml(r.shop_name)}</div>
       <div class="meta">${escapeHtml(r.id)} · ${escapeHtml(r.phone || "—")}</div>
       <div class="last">${escapeHtml(r.last_order?.items_summary || "No orders yet")}</div>
+      ${timerHtml}
     `;
     btn.addEventListener("click", () => selectRetailer(r.id));
     li.appendChild(btn);
     ul.appendChild(li);
   }
+}
+
+function fillScheduleForm(r) {
+  const has = !!r;
+  $("btnSaveSchedule").disabled = !has;
+  $("btnClearSchedule").disabled = !has || !r?.schedule;
+  if (!has) {
+    $("scheduleAt").value = "";
+    $("scheduleNote").value = "";
+    $("scheduleCadence").value = "custom";
+    const cd = $("scheduleCountdown");
+    cd.textContent = "—";
+    cd.className = "countdown muted";
+    return;
+  }
+  const sch = liveSchedule(r);
+  $("scheduleAt").value = toDatetimeLocalValue(sch?.next_call_at) || "";
+  $("scheduleNote").value = sch?.note || r.schedule?.note || "";
+  $("scheduleCadence").value = sch?.cadence || r.schedule?.cadence || "custom";
+  updateScheduleCountdown();
+}
+
+function updateScheduleCountdown() {
+  const r = state.retailers.find((x) => x.id === state.selectedRetailerId);
+  const cd = $("scheduleCountdown");
+  if (!cd) return;
+  const sch = liveSchedule(r);
+  if (!sch) {
+    cd.textContent = "No schedule";
+    cd.className = "countdown muted";
+    return;
+  }
+  cd.textContent = formatCountdown(sch.seconds_until);
+  cd.className = `countdown ${sch.status}`;
+  cd.title = sch.note || sch.label || "";
 }
 
 function selectRetailer(id) {
@@ -71,12 +150,74 @@ function selectRetailer(id) {
     : "No retailer selected";
   $("btnCall").disabled = !r;
   renderRetailers();
+  fillScheduleForm(r);
   const shopOrders = state.orders.filter((o) => o.retailer_id === id);
   if (shopOrders[0]) {
     state.selectedOrderId = shopOrders[0].order_id;
   }
   renderOrderSelect();
   renderOrderCard();
+}
+
+function presetDatetime(kind) {
+  const d = new Date();
+  if (kind === "30m") d.setMinutes(d.getMinutes() + 30);
+  else if (kind === "2h") d.setHours(d.getHours() + 2);
+  else if (kind === "tomorrow10") {
+    d.setDate(d.getDate() + 1);
+    d.setHours(10, 0, 0, 0);
+  } else if (kind === "today17") {
+    d.setHours(17, 0, 0, 0);
+    if (d.getTime() < Date.now()) d.setDate(d.getDate() + 1);
+  }
+  $("scheduleAt").value = toDatetimeLocalValue(d.toISOString());
+}
+
+async function saveSchedule(ev) {
+  ev.preventDefault();
+  const id = state.selectedRetailerId;
+  if (!id) return;
+  const box = $("scheduleStatus");
+  box.hidden = false;
+  box.classList.remove("err");
+  box.textContent = "Saving timeline…";
+  try {
+    const data = await api(`/v1/retailers/${encodeURIComponent(id)}/schedule`, {
+      method: "PUT",
+      body: JSON.stringify({
+        next_call_at: $("scheduleAt").value,
+        note: $("scheduleNote").value.trim() || null,
+        cadence: $("scheduleCadence").value,
+      }),
+    });
+    const r = state.retailers.find((x) => x.id === id);
+    if (r) r.schedule = data.schedule;
+    box.textContent = `Scheduled ${data.schedule?.label || ""}`;
+    renderRetailers();
+    fillScheduleForm(r);
+  } catch (err) {
+    box.classList.add("err");
+    box.textContent = err.message;
+  }
+}
+
+async function clearSchedule() {
+  const id = state.selectedRetailerId;
+  if (!id) return;
+  const box = $("scheduleStatus");
+  box.hidden = false;
+  box.classList.remove("err");
+  try {
+    await api(`/v1/retailers/${encodeURIComponent(id)}/schedule`, { method: "DELETE" });
+    const r = state.retailers.find((x) => x.id === id);
+    if (r) r.schedule = null;
+    box.textContent = "Schedule cleared";
+    renderRetailers();
+    fillScheduleForm(r);
+  } catch (err) {
+    box.classList.add("err");
+    box.textContent = err.message;
+  }
 }
 
 function renderOrderSelect() {
@@ -333,12 +474,13 @@ async function saveAgent(ev) {
 }
 
 async function loadAll() {
-  const [health, retailers, orders, wa, cbs] = await Promise.all([
+  const [health, retailers, orders, wa, cbs, calls] = await Promise.all([
     api("/health"),
     api("/v1/retailers"),
     api("/v1/orders?limit=50"),
     api("/v1/whatsapp/outbox"),
     api("/v1/callbacks"),
+    api("/v1/calls/recent?limit=15"),
   ]);
   setHealth(health.status === "ok", `${health.service} · ${health.phase}`);
   state.retailers = retailers.retailers || [];
@@ -351,10 +493,12 @@ async function loadAll() {
   const r = state.retailers.find((x) => x.id === state.selectedRetailerId);
   $("selectedLabel").textContent = r ? `${r.shop_name} · ${r.phone}` : "No retailer selected";
   $("btnCall").disabled = !r;
+  fillScheduleForm(r);
   renderOrderSelect();
   renderOrderCard();
   renderWa(wa.messages || []);
   renderCallbacks(cbs.callbacks || []);
+  renderCalls(calls.calls || []);
   if (!$("agentsPanel").hidden) {
     loadAgents().catch(() => {});
   }
@@ -366,20 +510,144 @@ async function loadOrders() {
   state.pipeline = orders.status_pipeline || state.pipeline;
 }
 
+function renderCalls(rows) {
+  const ul = $("callList");
+  if (!ul) return;
+  state.calls = rows || state.calls || [];
+  ul.innerHTML = "";
+  if (!state.calls.length) {
+    ul.innerHTML = `<li class="muted">No outbound calls yet</li>`;
+    return;
+  }
+  for (const c of state.calls) {
+    const li = document.createElement("li");
+    li.className = "wa-item";
+    const orderLine = c.order_id
+      ? `<strong>${escapeHtml(c.order_id)}</strong> · ${escapeHtml(c.items_summary || "order booked")}`
+      : c.status === "in_progress"
+        ? `<em>In progress — waiting for order…</em>`
+        : c.status === "no_order"
+          ? `<em>Ended — no new order (earlier ORD still on file)</em>`
+          : `<em>No order on this call</em>`;
+    li.innerHTML = `
+      <div class="to">${escapeHtml(c.shop_name || c.retailer_id || "")} · ${escapeHtml(c.status || "")}</div>
+      <p class="body">${orderLine}</p>
+      <div class="oid">${escapeHtml((c.execution_id || "").slice(0, 8))}…</div>
+    `;
+    if (c.order_id) {
+      li.style.cursor = "pointer";
+      li.addEventListener("click", () => {
+        if (c.retailer_id) selectRetailer(c.retailer_id);
+        state.selectedOrderId = c.order_id;
+        renderOrderSelect();
+        renderOrderCard();
+        const card = $("orderCard");
+        card.classList.add("highlight");
+        setTimeout(() => card.classList.remove("highlight"), 2500);
+      });
+    }
+    ul.appendChild(li);
+  }
+}
+
+function showCallResult(call) {
+  const card = $("callResultCard");
+  if (!card || !call?.order_id) return;
+  card.hidden = false;
+  card.classList.add("flash");
+  $("callResultOrder").textContent = call.order_id;
+  $("callResultMeta").textContent = [
+    call.shop_name || call.retailer_id || "",
+    call.items_summary || "",
+    "confirmed",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  setTimeout(() => card.classList.remove("flash"), 2000);
+}
+
+function stopCallPoll() {
+  if (state.pollTimer) {
+    clearInterval(state.pollTimer);
+    state.pollTimer = null;
+  }
+  state.activeExecutionId = null;
+}
+
+async function pollCallUntilOrder(executionId, retailerId) {
+  stopCallPoll();
+  state.activeExecutionId = executionId;
+  const box = $("callStatus");
+  let tries = 0;
+  const maxTries = 80; // ~4 min at 3s
+  state.pollTimer = setInterval(async () => {
+    tries += 1;
+    try {
+      const data = await api(`/v1/calls/${encodeURIComponent(executionId)}`);
+      const call = data.call || {};
+      if (call.order_id) {
+        stopCallPoll();
+        box.classList.remove("err");
+        box.classList.add("ok-order");
+        box.textContent = `Order booked: ${call.order_id} · ${call.items_summary || ""}`;
+        showCallResult(call);
+        await loadOrders();
+        if (retailerId) {
+          state.selectedRetailerId = retailerId;
+          state.selectedOrderId = call.order_id;
+          renderRetailers();
+          fillScheduleForm(state.retailers.find((x) => x.id === retailerId));
+        }
+        renderOrderSelect();
+        renderOrderCard();
+        $("orderCard")?.classList.add("highlight");
+        const [recent, wa] = await Promise.all([
+          api("/v1/calls/recent?limit=15"),
+          api("/v1/whatsapp/outbox"),
+        ]);
+        renderCalls(recent.calls || []);
+        renderWa(wa.messages || []);
+        return;
+      }
+      box.classList.remove("ok-order");
+      box.textContent = `Call in progress… waiting for order (${tries * 3}s) · ${executionId.slice(0, 8)}…`;
+      const [recent, wa] = await Promise.all([
+        api("/v1/calls/recent?limit=15"),
+        api("/v1/whatsapp/outbox"),
+      ]);
+      renderCalls(recent.calls || []);
+      renderWa(wa.messages || []);
+    } catch {
+      /* keep polling */
+    }
+    if (tries >= maxTries) {
+      stopCallPoll();
+      box.textContent = "Call watch timed out — refresh to see if an order appeared.";
+    }
+  }, 3000);
+}
+
 async function placeCall() {
   const id = state.selectedRetailerId;
   if (!id) return;
   const box = $("callStatus");
   box.hidden = false;
-  box.classList.remove("err");
+  box.classList.remove("err", "ok-order");
   box.textContent = "Queuing outbound call via Bolna…";
   $("btnCall").disabled = true;
+  stopCallPoll();
   try {
     const data = await api("/v1/calls/outbound", {
       method: "POST",
       body: JSON.stringify({ retailer_id: id }),
     });
-    box.textContent = `Queued ${data.shop_name} → ${data.dialed} · execution ${data.execution_id || "?"}`;
+    const eid = data.execution_id;
+    box.textContent = eid
+      ? `Calling ${data.shop_name}… watching for order · ${eid.slice(0, 8)}…`
+      : `Queued ${data.shop_name} → ${data.dialed}`;
+    if (eid) pollCallUntilOrder(eid, id);
+    const recent = await api("/v1/calls/recent?limit=15");
+    renderCalls(recent.calls || []);
   } catch (err) {
     box.classList.add("err");
     box.textContent = err.message;
@@ -424,9 +692,36 @@ $("btnCancelAgent").addEventListener("click", () => {
   if (state.agents[0]) selectAgent(state.agents[0].agent_id);
 });
 $("agentForm").addEventListener("submit", saveAgent);
+$("scheduleForm").addEventListener("submit", saveSchedule);
+$("btnClearSchedule").addEventListener("click", clearSchedule);
+document.querySelectorAll("[data-preset]").forEach((btn) => {
+  btn.addEventListener("click", () => presetDatetime(btn.getAttribute("data-preset")));
+});
+
+function tickTimers() {
+  // Update countdown labels in place (avoid rebuilding the list every second)
+  document.querySelectorAll("#retailerList .retailer").forEach((btn, idx) => {
+    const r = state.retailers[idx];
+    if (!r) return;
+    const sch = liveSchedule(r);
+    const timer = btn.querySelector(".timer");
+    if (!timer) return;
+    if (!sch) {
+      timer.textContent = "No schedule";
+      timer.className = "timer";
+      btn.classList.remove("due-glow");
+      return;
+    }
+    timer.textContent = `${formatCountdown(sch.seconds_until)} · ${sch.label || ""}`;
+    timer.className = `timer ${sch.status}`;
+    btn.classList.toggle("due-glow", sch.status !== "upcoming");
+  });
+  updateScheduleCountdown();
+}
 
 tickClock();
 setInterval(tickClock, 1000);
+setInterval(tickTimers, 1000);
 loadAll().catch((e) => setHealth(false, e.message));
 setInterval(() => {
   loadAll().catch(() => {});

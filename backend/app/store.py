@@ -52,6 +52,114 @@ def get_retailer(retailer_id: str) -> dict[str, Any] | None:
     return None
 
 
+def _ensure_schedules() -> dict[str, Any]:
+    db = load_db()
+    if "call_schedules" not in db:
+        # Demo seeds so the dashboard timer is visible immediately
+        now = datetime.now(_IST)
+        db["call_schedules"] = {
+            "R01": {
+                "retailer_id": "R01",
+                "next_call_at": (now + timedelta(hours=2)).isoformat(),
+                "note": "Weekly order window",
+                "cadence": "custom",
+                "updated_at": now.isoformat(),
+            },
+            "R02": {
+                "retailer_id": "R02",
+                "next_call_at": (now + timedelta(minutes=45)).isoformat(),
+                "note": "Prefer late morning",
+                "cadence": "custom",
+                "updated_at": now.isoformat(),
+            },
+        }
+    return db["call_schedules"]
+
+
+def _parse_iso_ist(value: str) -> datetime:
+    raw = (value or "").strip()
+    if not raw:
+        raise ValueError("next_call_at is required")
+    # datetime-local from browser: 2026-10-29T17:30
+    if len(raw) == 16 and "T" in raw and raw.count(":") == 1:
+        raw = raw + ":00"
+    dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=_IST)
+    return dt.astimezone(_IST)
+
+
+def schedule_payload(row: dict[str, Any] | None) -> dict[str, Any] | None:
+    """Enrich a schedule row with countdown fields for the ops console."""
+    if not row or not row.get("next_call_at"):
+        return None
+    try:
+        when = _parse_iso_ist(str(row["next_call_at"]))
+    except ValueError:
+        return None
+    now = datetime.now(_IST)
+    seconds = int((when - now).total_seconds())
+    if seconds > 0:
+        status = "upcoming"
+    elif seconds > -3600:
+        status = "due"
+    else:
+        status = "overdue"
+    return {
+        "retailer_id": row.get("retailer_id"),
+        "next_call_at": when.isoformat(),
+        "note": row.get("note") or "",
+        "cadence": row.get("cadence") or "custom",
+        "updated_at": row.get("updated_at"),
+        "seconds_until": seconds,
+        "status": status,
+        "label": when.strftime("%d %b %I:%M %p"),
+    }
+
+
+def get_call_schedule(retailer_id: str) -> dict[str, Any] | None:
+    row = _ensure_schedules().get(retailer_id)
+    return schedule_payload(row)
+
+
+def set_call_schedule(
+    retailer_id: str,
+    *,
+    next_call_at: str,
+    note: str | None = None,
+    cadence: str | None = None,
+) -> dict[str, Any]:
+    if get_retailer(retailer_id) is None:
+        raise ValueError(f"Retailer {retailer_id} not found")
+    when = _parse_iso_ist(next_call_at)
+    row = {
+        "retailer_id": retailer_id,
+        "next_call_at": when.isoformat(),
+        "note": (note or "").strip(),
+        "cadence": (cadence or "custom").strip() or "custom",
+        "updated_at": datetime.now(_IST).isoformat(),
+    }
+    _ensure_schedules()[retailer_id] = row
+    return schedule_payload(row)  # type: ignore[return-value]
+
+
+def clear_call_schedule(retailer_id: str) -> None:
+    _ensure_schedules().pop(retailer_id, None)
+
+
+def list_due_schedules() -> list[dict[str, Any]]:
+    """Retailers whose call window is due/overdue — for the dashboard strip."""
+    out: list[dict[str, Any]] = []
+    for rid, row in list(_ensure_schedules().items()):
+        payload = schedule_payload({**row, "retailer_id": rid})
+        if payload and payload["status"] in {"due", "overdue"}:
+            retailer = get_retailer(rid)
+            payload["shop_name"] = (retailer or {}).get("shop_name")
+            out.append(payload)
+    out.sort(key=lambda x: x.get("seconds_until", 0))
+    return out
+
+
 def normalize_phone(phone: str) -> str:
     """
     Keep digits only so '+91 98765-43210' and '919876543210' match.
@@ -380,7 +488,222 @@ def create_order(
         if sku_row is not None:
             sku_row["stock_qty"] = max(0, int(sku_row.get("stock_qty", 0)) - line["qty"])
 
+    items_summary = ", ".join(
+        f"{i['qty']} {i['unit']} {i['name']}" for i in resolved_items
+    )
+
+    # Link to the open outbound call so the dashboard can show ORD-… when the call ends.
+    attach_order_to_call(
+        retailer_id=retailer_id,
+        order_id=order_id,
+        call_execution_id=call_execution_id,
+        items_summary=items_summary,
+    )
+
+    # Always push a mock WhatsApp confirmation when an order is booked
+    # (Bolna may also call /whatsapp/send — send_whatsapp is idempotent per order_id).
+    send_whatsapp(
+        retailer["phone"],
+        order_id=order_id,
+        summary_text=(
+            f"TradeCall: Order {order_id} confirm - {items_summary}. "
+            f"{order.get('eta_text') or ''}"
+        ).strip(),
+    )
+
     return order
+
+
+def _ensure_call_sessions() -> list[dict[str, Any]]:
+    db = load_db()
+    if "call_sessions" not in db:
+        db["call_sessions"] = []
+    return db["call_sessions"]
+
+
+def start_call_session(
+    *,
+    execution_id: str,
+    retailer_id: str,
+    shop_name: str | None,
+    phone: str | None,
+) -> dict[str, Any]:
+    """Record an outbound dial so the console can poll for the resulting order."""
+    now = datetime.now(_IST)
+    # Close older open dials for this shop — they aren't "waiting for order" anymore.
+    for s in _ensure_call_sessions():
+        if (
+            s.get("retailer_id") == retailer_id
+            and s.get("status") == "in_progress"
+            and not s.get("order_id")
+        ):
+            s["status"] = "no_order"
+            s["ended_at"] = now.isoformat()
+            s["updated_at"] = s["ended_at"]
+
+    row = {
+        "execution_id": execution_id,
+        "retailer_id": retailer_id,
+        "shop_name": shop_name or "",
+        "phone": phone or "",
+        "status": "in_progress",
+        "order_id": None,
+        "items_summary": None,
+        "started_at": now.isoformat(),
+        "ended_at": None,
+        "updated_at": now.isoformat(),
+    }
+    _ensure_call_sessions().insert(0, row)
+    # Keep last 40 only
+    sessions = _ensure_call_sessions()
+    del sessions[40:]
+    return row
+
+
+def attach_order_to_call(
+    *,
+    retailer_id: str,
+    order_id: str,
+    call_execution_id: str | None = None,
+    items_summary: str | None = None,
+) -> dict[str, Any] | None:
+    """Bind a newly created order to the matching open call session."""
+    sessions = _ensure_call_sessions()
+    target: dict[str, Any] | None = None
+    if call_execution_id:
+        for s in sessions:
+            if s.get("execution_id") == call_execution_id:
+                target = s
+                break
+    if target is None:
+        for s in sessions:
+            if (
+                s.get("retailer_id") == retailer_id
+                and s.get("status") == "in_progress"
+                and not s.get("order_id")
+            ):
+                target = s
+                break
+    if target is None:
+        # Still surface on dashboard even if Call now wasn't used (manual tool test)
+        target = {
+            "execution_id": call_execution_id or f"local-{order_id}",
+            "retailer_id": retailer_id,
+            "shop_name": (get_retailer(retailer_id) or {}).get("shop_name") or "",
+            "phone": (get_retailer(retailer_id) or {}).get("phone") or "",
+            "status": "completed",
+            "started_at": datetime.now(_IST).isoformat(),
+        }
+        sessions.insert(0, target)
+
+    target["order_id"] = order_id
+    target["items_summary"] = items_summary
+    target["status"] = "completed"
+    target["ended_at"] = datetime.now(_IST).isoformat()
+    target["updated_at"] = target["ended_at"]
+    return target
+
+
+def get_call_session(execution_id: str) -> dict[str, Any] | None:
+    for s in _ensure_call_sessions():
+        if s.get("execution_id") == execution_id:
+            return dict(s)
+    return None
+
+
+def list_call_sessions(*, limit: int = 20) -> list[dict[str, Any]]:
+    _close_stale_sessions()
+    rows = list(_ensure_call_sessions())[: max(1, limit)]
+    return [dict(r) for r in rows]
+
+
+def _parse_session_time(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=_IST)
+        return dt.astimezone(_IST)
+    except ValueError:
+        return None
+
+
+def _order_already_linked(order_id: str) -> bool:
+    for s in _ensure_call_sessions():
+        if s.get("order_id") == order_id and s.get("status") == "completed":
+            return True
+    return False
+
+
+def _link_order_if_ready(session: dict[str, Any]) -> bool:
+    """If an order was created for this retailer after dial, attach it. Returns True if linked."""
+    if session.get("order_id"):
+        return True
+    started = _parse_session_time(session.get("started_at"))
+    if started is None:
+        return False
+    for order in get_orders_for_retailer(session["retailer_id"]):
+        created = _parse_session_time(order.get("created_at"))
+        if created is None or created < started:
+            continue
+        oid = order["order_id"]
+        # Don't steal an order already credited to another completed call
+        if _order_already_linked(oid):
+            continue
+        session["order_id"] = oid
+        session["items_summary"] = ", ".join(
+            f"{i.get('qty')} {i.get('unit')} {i.get('name')}"
+            for i in order.get("items", [])
+        )
+        session["status"] = "completed"
+        session["ended_at"] = datetime.now(_IST).isoformat()
+        session["updated_at"] = session["ended_at"]
+        return True
+    return False
+
+
+_STALE_CALL_MINUTES = 8
+
+
+def _close_stale_sessions() -> None:
+    """Mark long-running dials with no order as finished (no_order)."""
+    now = datetime.now(_IST)
+    for s in _ensure_call_sessions():
+        if s.get("status") != "in_progress" or s.get("order_id"):
+            continue
+        started = _parse_session_time(s.get("started_at"))
+        if started is None:
+            continue
+        if (now - started) > timedelta(minutes=_STALE_CALL_MINUTES):
+            s["status"] = "no_order"
+            s["ended_at"] = now.isoformat()
+            s["updated_at"] = s["ended_at"]
+
+
+def refresh_call_session(execution_id: str) -> dict[str, Any] | None:
+    """Poll helper: detect order booked mid-call without requiring Bolna webhooks."""
+    _close_stale_sessions()
+    for s in _ensure_call_sessions():
+        if s.get("execution_id") == execution_id:
+            if s.get("status") == "in_progress":
+                _link_order_if_ready(s)
+            return dict(s)
+    return None
+
+
+def complete_call_session(execution_id: str, *, status: str = "completed") -> dict[str, Any] | None:
+    for s in _ensure_call_sessions():
+        if s.get("execution_id") == execution_id:
+            _link_order_if_ready(s)
+            if not s.get("order_id"):
+                s["status"] = "no_order" if status == "completed" else status
+            elif s.get("status") == "in_progress":
+                s["status"] = "completed"
+            s["ended_at"] = s.get("ended_at") or datetime.now(_IST).isoformat()
+            s["updated_at"] = datetime.now(_IST).isoformat()
+            return dict(s)
+    return None
 
 
 def order_status_payload(order: dict[str, Any]) -> dict[str, Any]:
@@ -473,6 +796,13 @@ def update_order_status(
     return order_status_payload(order)
 
 
+def _ensure_whatsapp_outbox() -> list[dict[str, Any]]:
+    db = load_db()
+    if "whatsapp_outbox" not in db or db["whatsapp_outbox"] is None:
+        db["whatsapp_outbox"] = []
+    return db["whatsapp_outbox"]
+
+
 def send_whatsapp(
     retailer_phone: str,
     *,
@@ -484,9 +814,18 @@ def send_whatsapp(
 
     Appends a message to db['whatsapp_outbox'] so the ops console can prove
     "confirmation was sent" after a call. Real WA can replace this later.
+
+    Idempotent: if order_id is already in the outbox, return that row
+    (create_order + Bolna closing node both call this).
     """
+    box = _ensure_whatsapp_outbox()
+    if order_id:
+        for existing in box:
+            if existing.get("order_id") == order_id:
+                return existing
+
     msg = {
-        "id": f"WA-{len(load_db()['whatsapp_outbox']) + 1:04d}",
+        "id": f"WA-{len(box) + 1:04d}",
         "to": retailer_phone,
         "order_id": order_id,
         "summary_text": summary_text,
@@ -494,13 +833,13 @@ def send_whatsapp(
         "status": "sent",
         "sent_at": datetime.now(_IST).isoformat(),
     }
-    load_db()["whatsapp_outbox"].append(msg)
+    box.append(msg)
     return msg
 
 
 def list_whatsapp_outbox() -> list[dict[str, Any]]:
     """Newest first — dashboard reads this panel."""
-    box = list(load_db()["whatsapp_outbox"])
+    box = list(_ensure_whatsapp_outbox())
     box.sort(key=lambda m: m.get("sent_at", ""), reverse=True)
     return box
 

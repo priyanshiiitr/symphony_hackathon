@@ -80,6 +80,54 @@
         <button type="button" id="btnCall" class="btn primary" disabled>Call now</button>
       </div>
       <p id="callStatus" class="call-status" hidden></p>
+      <article id="callResultCard" class="call-result" hidden>
+        <p class="scrubber-label">Last call result</p>
+        <h3 id="callResultOrder">—</h3>
+        <p id="callResultMeta" class="muted"></p>
+      </article>
+
+      <div class="panel-head" style="margin-top:0.75rem">
+        <h2>Recent calls</h2>
+        <p class="hint">Order number appears here when the voice agent books during the call.</p>
+      </div>
+      <ul id="callList" class="wa-list call-list"></ul>
+
+      <div class="schedule-block" id="scheduleBlock">
+        <div class="panel-head row">
+          <div>
+            <h2>Call schedule</h2>
+            <p class="hint">Set when to call this shop. Timer counts down on the list.</p>
+          </div>
+          <div id="scheduleCountdown" class="countdown muted">—</div>
+        </div>
+        <form id="scheduleForm" class="schedule-form">
+          <label>Next call
+            <input type="datetime-local" id="scheduleAt" required />
+          </label>
+          <label>Note
+            <input type="text" id="scheduleNote" placeholder="e.g. Shaam 5, weekly route" />
+          </label>
+          <label>Cadence
+            <select id="scheduleCadence" class="select">
+              <option value="once">Once</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="custom" selected>Custom</option>
+            </select>
+          </label>
+          <div class="schedule-presets">
+            <button type="button" class="btn small" data-preset="30m">+30 min</button>
+            <button type="button" class="btn small" data-preset="2h">+2 hours</button>
+            <button type="button" class="btn small" data-preset="tomorrow10">Tomorrow 10:00</button>
+            <button type="button" class="btn small" data-preset="today17">Today 5:00 PM</button>
+          </div>
+          <div class="agent-actions">
+            <button type="submit" class="btn primary" id="btnSaveSchedule" disabled>Save timeline</button>
+            <button type="button" class="btn ghost" id="btnClearSchedule" disabled>Clear</button>
+          </div>
+          <p id="scheduleStatus" class="call-status" hidden></p>
+        </form>
+      </div>
 
       <div class="order-block">
         <div class="panel-head row">

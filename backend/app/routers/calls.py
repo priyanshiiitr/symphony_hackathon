@@ -13,7 +13,13 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from app.store import get_last_order, get_retailer
+from app.store import (
+    get_last_order,
+    get_retailer,
+    list_call_sessions,
+    refresh_call_session,
+    start_call_session,
+)
 
 router = APIRouter(prefix="/v1/calls", tags=["calls"])
 
@@ -50,6 +56,33 @@ def _last_order_summary(retailer_id: str) -> str:
         f"{i.get('qty')} {i.get('unit')} {i.get('name')}" for i in order.get("items", [])
     )
     return f"Last order {order.get('order_id')}: {summary}"
+
+
+@router.get("/recent")
+def recent_calls(limit: int = 15) -> dict[str, Any]:
+    """Ops console: recent outbound dials + order_id when booked during the call."""
+    rows = list_call_sessions(limit=limit)
+    # Refresh in-progress rows so order numbers appear without a separate poll
+    out = []
+    for row in rows:
+        if row.get("status") == "in_progress" and row.get("execution_id"):
+            refreshed = refresh_call_session(str(row["execution_id"]))
+            out.append(refreshed or row)
+        else:
+            out.append(row)
+    return {"count": len(out), "calls": out}
+
+
+@router.get("/{execution_id}")
+def call_status(execution_id: str) -> dict[str, Any]:
+    """
+    Poll while a call is live. When create_order fires for that retailer,
+    order_id appears here so the dashboard can show ORD-….
+    """
+    row = refresh_call_session(execution_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail=f"Unknown execution {execution_id}")
+    return {"ok": True, "call": row}
 
 
 @router.post("/outbound")
@@ -111,11 +144,22 @@ def trigger_outbound(body: OutboundCallIn) -> dict[str, Any]:
     except urllib.error.URLError as e:
         raise HTTPException(status_code=502, detail=f"Bolna unreachable: {e}") from e
 
+    execution_id = data.get("execution_id") or data.get("run_id") or ""
+    session = None
+    if execution_id:
+        session = start_call_session(
+            execution_id=str(execution_id),
+            retailer_id=retailer["id"],
+            shop_name=retailer.get("shop_name"),
+            phone=to,
+        )
+
     return {
         "ok": True,
         "retailer_id": retailer["id"],
         "shop_name": retailer.get("shop_name"),
         "dialed": to,
-        "execution_id": data.get("execution_id") or data.get("run_id"),
+        "execution_id": execution_id or None,
+        "session": session,
         "bolna": data,
     }

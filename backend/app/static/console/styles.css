@@ -294,6 +294,116 @@ body {
   background: #2a1a18;
   color: #f0c4bc;
 }
+.call-status.ok-order {
+  border-color: var(--ok);
+  background: #1a2a21;
+  color: #b8f0d0;
+}
+
+.call-result {
+  margin-top: 0.75rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid #3d5a48;
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, #1a2a21, var(--bg0));
+  animation: rise 360ms ease both;
+}
+.call-result h3 {
+  margin: 0.2rem 0 0;
+  font-family: var(--font-mono);
+  font-size: 1.25rem;
+  color: var(--accent);
+}
+.call-result.flash {
+  animation: pulse 0.9s ease 2;
+}
+.call-list { max-height: 160px; }
+.order-card.highlight {
+  border-color: var(--accent);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.schedule-block {
+  margin-top: 1rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+.schedule-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.55rem 0.75rem;
+}
+.schedule-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.schedule-form label:first-child { grid-column: 1 / -1; }
+.schedule-form input[type="datetime-local"],
+.schedule-form input[type="text"] {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  background: var(--bg0);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.45rem 0.55rem;
+}
+.schedule-form .agent-actions,
+.schedule-presets,
+.schedule-form #scheduleStatus {
+  grid-column: 1 / -1;
+}
+.schedule-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.countdown {
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  font-weight: 500;
+  padding: 0.35rem 0.6rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--bg0);
+  color: var(--text);
+  min-width: 7rem;
+  text-align: center;
+}
+.countdown.upcoming { color: #b8d4c4; border-color: #3d5a48; }
+.countdown.due {
+  color: #1a1405;
+  background: var(--accent);
+  border-color: var(--accent-dim);
+  animation: pulse 1.2s ease infinite;
+}
+.countdown.overdue {
+  color: #f0c4bc;
+  border-color: #6b3a32;
+  background: #2a1a18;
+}
+@keyframes pulse {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.12); }
+}
+.retailer .timer {
+  margin-top: 0.35rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: #9eb8a8;
+}
+.retailer .timer.due { color: var(--accent); font-weight: 600; }
+.retailer .timer.overdue { color: var(--danger); font-weight: 600; }
+.retailer.due-glow {
+  border-color: var(--accent);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
 
 .order-block { margin-top: 1.25rem; flex: 1; display: flex; flex-direction: column; gap: 0.75rem; }
 .select {
